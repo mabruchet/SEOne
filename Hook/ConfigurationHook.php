@@ -9,6 +9,7 @@ use SEOne\Form\StoreSeoForm;
 use SEOne\Model\Robots;
 use SEOne\Model\RobotsQuery;
 use SEOne\SEOne;
+use SEOne\Service\EditionLanguageResolver;
 use SEOne\Service\MetaTemplate\MetaTemplateService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Thelia\Core\Event\Hook\HookRenderEvent;
@@ -26,6 +27,7 @@ class ConfigurationHook extends BaseHook
     public function __construct(
         private readonly TheliaFormFactory $formFactory,
         private readonly MetaTemplateService $metaTemplateService,
+        private readonly EditionLanguageResolver $editionLanguageResolver,
         ?EventDispatcherInterface $dispatcher = null,
         ?ParserResolver $parserResolver = null,
     ) {
@@ -89,19 +91,11 @@ class ConfigurationHook extends BaseHook
     }
 
     /**
-     * The language the templates are shown and saved in: the one the switcher asked for, then
-     * the administrator's own, which is what the controller resolves on save.
+     * The language the templates are shown and saved in, the one the form reads and the controller saves into.
      */
     protected function getMetaTemplateEditLanguageId(): int
     {
-        $request = $this->getRequest();
-        $requestedLanguageId = $request?->query->get('edit_language_id') ?? $request?->request->get('edit_language_id');
-
-        if (null !== $requestedLanguageId && null !== LangQuery::create()->findOneById($requestedLanguageId)) {
-            return (int) $requestedLanguageId;
-        }
-
-        return (int) $this->getSession()->getAdminLang()->getId();
+        return (int) $this->editionLanguageResolver->resolve()->getId();
     }
 
     public static function getSubscribedHooks(): array
