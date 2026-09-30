@@ -76,7 +76,9 @@
                                         data-bs-target="#seone-meta-collapse-{{ entry.view }}"
                                         aria-expanded="false"
                                         aria-controls="seone-meta-collapse-{{ entry.view }}">
-                                    {{ ('meta_template.view.' ~ entry.view)|trans({}, 'seone') }}
+                                    {# A page kind brought by another module has no label here: its name stands in. #}
+                                    {% set view_label = ('meta_template.view.' ~ entry.view)|trans({}, 'seone') %}
+                                    {{ view_label starts with 'meta_template.view.' ? entry.view|capitalize : view_label }}
                                 </button>
                             </h2>
                             <div id="seone-meta-collapse-{{ entry.view }}"
