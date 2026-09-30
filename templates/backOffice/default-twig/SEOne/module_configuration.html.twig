@@ -41,6 +41,7 @@
      data-seone-preview-language="{{ meta_template_edit_language_id }}"
      data-seone-preview-empty="{{ 'meta_template.preview.empty'|trans({}, 'seone') }}"
      data-seone-preview-unknown="{{ 'meta_template.preview.unknown'|trans({}, 'seone') }}"
+     data-seone-example-record="{{ 'meta_template.example.record'|trans({}, 'seone') }}"
      data-seone-preview-failed="{{ 'meta_template.preview.error.generic'|trans({}, 'seone') }}">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h5 class="card-title mb-0">{{ 'meta_template.card.title'|trans({}, 'seone') }}</h5>
@@ -57,7 +58,8 @@
 
             {{ form_errors(meta_template_form) }}
 
-            <p class="text-muted small">{{ 'meta_template.help'|trans({}, 'seone') }}</p>
+            <p class="text-muted small mb-1">{{ 'meta_template.help'|trans({}, 'seone') }}</p>
+            <p class="small mb-3" data-seone-priority>{{ 'meta_template.priority'|trans({}, 'seone') }}</p>
 
             <div class="row">
                 <div class="col-md-3 mb-3">
@@ -92,6 +94,30 @@
                                  aria-labelledby="seone-meta-heading-{{ entry.view }}"
                                  data-bs-parent="#seone-meta-templates-accordion">
                                 <div class="accordion-body">
+                                    {% set example_label = entry.example_id is null ? null : entry.records[entry.example_id] %}
+                                    <table class="table table-sm small align-middle mb-4" data-seone-examples="{{ entry.view }}">
+                                        <caption class="caption-top pt-0" data-seone-example-record>
+                                            {{- example_label is null
+                                                ? 'meta_template.example.none'|trans({}, 'seone')
+                                                : 'meta_template.example.record'|trans({'%record%': example_label}, 'seone') -}}
+                                        </caption>
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">{{ 'meta_template.example.variable'|trans({}, 'seone') }}</th>
+                                                <th scope="col">{{ 'meta_template.example.value'|trans({}, 'seone') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for variable in entry.variables %}
+                                                {% set example_value = entry.example_values[variable] ?? '' %}
+                                                <tr>
+                                                    <td class="text-nowrap"><code>%{{ variable }}%</code></td>
+                                                    <td data-seone-example-value="{{ variable }}">{{ example_value|length > 90 ? example_value|slice(0, 90) ~ '…' : example_value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+
                                     {% for field_key in ['title', 'description'] %}
                                         {% set field = attribute(meta_template_form, entry.view ~ '_' ~ field_key) %}
                                         {% set max_length = attribute(meta_template_form, 'max_length_' ~ field_key).vars.value %}
@@ -315,6 +341,18 @@
                 unknown.textContent = card.dataset.seonePreviewUnknown.replace('%unknown%', answer.unknown.join(', '));
                 unknown.classList.toggle('d-none', 0 === answer.unknown.length);
                 unknown.classList.toggle('d-block', 0 !== answer.unknown.length);
+            });
+
+            var body = block.closest('.accordion-body');
+            var option = body.querySelector('datalist option[value="' + data.id + '"]');
+
+            body.querySelector('[data-seone-example-record]').textContent = card.dataset.seoneExampleRecord
+                .replace('%record%', option ? option.textContent : '#' + data.id);
+
+            body.querySelectorAll('[data-seone-example-value]').forEach(function (cell) {
+                var value = data.values[cell.dataset.seoneExampleValue] || '';
+
+                cell.textContent = value.length > 90 ? value.slice(0, 90) + '…' : value;
             });
 
             result.hidden = false;

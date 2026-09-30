@@ -30,8 +30,8 @@ use Thelia\Test\WebIntegrationTestCase;
 use Thelia\Tests\Support\BackOffice\AdminSessionInjector;
 
 /**
- * The meta template card of the SEOne configuration screen: the preview of a template on a
- * record, saved or not.
+ * The meta template card of the SEOne configuration screen: the order of priority, the example
+ * values of the variables, and the preview of a template on a record, saved or not.
  */
 final class MetaTemplateConfigurationScreenTest extends WebIntegrationTestCase
 {
@@ -59,6 +59,28 @@ final class MetaTemplateConfigurationScreenTest extends WebIntegrationTestCase
         $this->injector->clear();
 
         parent::tearDown();
+    }
+
+    #[Test]
+    public function theScreenStatesTheOrderOfPriorityAndShowsTheVariablesWithAnExample(): void
+    {
+        $product = $this->product();
+        $this->logIn($this->fixtures->admin());
+
+        $crawler = $this->client->request('GET', self::SCREEN, ['edit_language_id' => $this->englishId()]);
+
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString(
+            'the meta title or description typed on the record comes first',
+            $crawler->filter('[data-seone-priority]')->text(),
+        );
+
+        $examples = $crawler->filter('[data-seone-examples="product"]');
+        self::assertStringContainsString('%title%', $examples->text());
+        self::assertStringContainsString('%store_name%', $examples->text());
+        // The first record offered for the preview lends its values as the example.
+        self::assertNotSame('', trim($examples->filter('[data-seone-example-value="title"]')->text()));
+        self::assertGreaterThan(0, $crawler->filter('#seone-preview-records-product option[value="'.$product->getId().'"]')->count());
     }
 
     #[Test]

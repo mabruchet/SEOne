@@ -82,10 +82,10 @@ class ConfigurationHook extends BaseHook
 
     /**
      * One entry per view served by a resolver, in declaration order, each carrying the
-     * variables its templates may use and the records offered for the preview, the first of
-     * them chosen by default.
+     * variables its templates may use, the records offered for the preview, and the values
+     * of the variables on the first of them as an example.
      *
-     * @return list<array{view: string, variables: list<string>, records: array<int, string>, example_id: int|null}>
+     * @return list<array{view: string, variables: list<string>, records: array<int, string>, example_id: int|null, example_values: array<string, string>}>
      */
     protected function getMetaTemplateViews(string $locale): array
     {
@@ -100,6 +100,7 @@ class ConfigurationHook extends BaseHook
                 'variables' => $this->metaTemplateService->getVariableNames($view),
                 'records' => $records,
                 'example_id' => $exampleId,
+                'example_values' => null === $exampleId ? [] : $this->metaTemplateService->getVariableValues($view, $exampleId, $locale),
             ];
         }
 
