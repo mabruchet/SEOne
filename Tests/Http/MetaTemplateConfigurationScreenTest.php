@@ -15,11 +15,11 @@ declare(strict_types=1);
 namespace SEOne\Tests\Http;
 
 use PHPUnit\Framework\Attributes\Test;
+use Propel\Runtime\Propel;
 use SEOne\Service\MetaTemplate\MetaTemplateField;
 use SEOne\Service\MetaTemplate\MetaTemplateRepository;
 use SEOne\Service\SeoRequestMemo;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
-use Propel\Runtime\Propel;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Resource\AdminResources;
 use Thelia\Model\Admin;
