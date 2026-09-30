@@ -118,6 +118,14 @@ final class MetaTemplateRendererTest extends TestCase
     }
 
     #[Test]
+    public function itKeepsTheLastWordWhenItEndsExactlyAtTheMaximumLength(): void
+    {
+        $rendered = (new MetaTemplateRenderer())->render('%t%', ['t' => 'aaaa bbbb cccc'], 9);
+
+        self::assertSame('aaaa bbbb', $rendered);
+    }
+
+    #[Test]
     public function itKeepsAResultShorterThanTheMaximumLengthWhole(): void
     {
         $rendered = (new MetaTemplateRenderer())->render(

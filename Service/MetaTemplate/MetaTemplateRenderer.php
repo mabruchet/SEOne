@@ -93,10 +93,14 @@ final readonly class MetaTemplateRenderer
     private function truncateOnWord(string $text, int $maxLength): string
     {
         $cut = mb_substr($text, 0, $maxLength);
-        $lastSpace = mb_strrpos($cut, ' ');
 
-        if (false !== $lastSpace && $lastSpace > 0) {
-            $cut = mb_substr($cut, 0, $lastSpace);
+        // A word that ends exactly at the limit is whole: only a cut inside a word steps back to the previous one.
+        if (' ' !== mb_substr($text, $maxLength, 1)) {
+            $lastSpace = mb_strrpos($cut, ' ');
+
+            if (false !== $lastSpace && $lastSpace > 0) {
+                $cut = mb_substr($cut, 0, $lastSpace);
+            }
         }
 
         return $this->trimSeparators($cut);
