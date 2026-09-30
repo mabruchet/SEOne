@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace SEOne\Service\MetaTemplate;
 
 use Propel\Runtime\ActiveQuery\Criteria;
+use Propel\Runtime\Connection\ConnectionInterface;
 use SEOne\SEOne;
 use SEOne\Service\SeoRequestMemo;
 use Thelia\Model\ConfigQuery;
@@ -65,6 +66,42 @@ final readonly class MetaTemplateRepository
         }
 
         SEOne::setConfigValue(self::templateKey($view, $field), $template, $locale);
+    }
+
+    /**
+     * Drops the settings that hold nothing: the empty templates and the default maximum lengths
+     * a save of the form stored before they stopped being stored. Run on update, so a shop that
+     * saved the form with an earlier version reads no setting on its pages without saving again.
+     */
+    public function removeUnusedSettings(?ConnectionInterface $con = null): void
+    {
+        $settings = ModuleConfigQuery::create()
+            ->filterByModuleId(SEOne::getModuleId())
+            ->filterByName(self::TEMPLATE_KEY_PREFIX.'%', Criteria::LIKE)
+            ->find($con);
+
+        $defaultMaxLengths = [];
+
+        foreach (MetaTemplateField::cases() as $field) {
+            $defaultMaxLengths[self::maxLengthKey($field)] = (string) $field->defaultMaxLength();
+        }
+
+        foreach ($settings as $setting) {
+            $unusedValues = ['', $defaultMaxLengths[$setting->getName()] ?? ''];
+            $isUsed = false;
+
+            foreach (ModuleConfigI18nQuery::create()->filterById($setting->getId())->find($con) as $translation) {
+                if (\in_array(trim((string) $translation->getValue()), $unusedValues, true)) {
+                    $translation->delete($con);
+                } else {
+                    $isUsed = true;
+                }
+            }
+
+            if (!$isUsed) {
+                $setting->delete($con);
+            }
+        }
     }
 
     /**

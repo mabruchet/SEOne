@@ -14,7 +14,9 @@ namespace SEOne;
 
 use Propel\Runtime\Connection\ConnectionInterface;
 use SEOne\Service\InstallSql;
+use SEOne\Service\MetaTemplate\MetaTemplateRepository;
 use SEOne\Service\RobotTxtService;
+use SEOne\Service\SeoRequestMemo;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Thelia\Core\Install\Database;
 use Thelia\Module\BaseModule;
@@ -49,6 +51,15 @@ class SEOne extends BaseModule
         // not have to write one by hand (and no longer has to delete a stray
         // robots file from the front template).
         (new RobotTxtService())->initializeDefaultRobots();
+    }
+
+    /**
+     * Up to 1.2.1 the meta template form stored its empty fields and default lengths, which
+     * every page then read for nothing.
+     */
+    public function update($currentVersion, $newVersion, ?ConnectionInterface $con = null): void
+    {
+        (new MetaTemplateRepository(new SeoRequestMemo()))->removeUnusedSettings($con);
     }
 
     /**
