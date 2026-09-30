@@ -14,9 +14,12 @@ declare(strict_types=1);
 
 namespace SEOne\Service\MetaTemplate;
 
+use Propel\Runtime\ActiveQuery\Criteria;
 use SEOne\SEOne;
 use SEOne\Service\SeoRequestMemo;
 use Thelia\Model\ConfigQuery;
+use Thelia\Model\ModuleConfigI18nQuery;
+use Thelia\Model\ModuleConfigQuery;
 
 /**
  * Meta templates live in the module settings, next to the default title and description SEOne
@@ -53,7 +56,54 @@ final readonly class MetaTemplateRepository
 
     public function saveTemplate(string $view, MetaTemplateField $field, string $locale, string $template): void
     {
-        SEOne::setConfigValue(self::templateKey($view, $field), trim($template), $locale);
+        $template = trim($template);
+
+        if ('' === $template) {
+            $this->removeSetting(self::templateKey($view, $field), $locale);
+
+            return;
+        }
+
+        SEOne::setConfigValue(self::templateKey($view, $field), $template, $locale);
+    }
+
+    /**
+     * An empty template is not stored. Every product, category, content and folder page asks for
+     * the template of its kind, and a setting that exists costs a read of its translated value
+     * even when that value is empty; a setting that does not exist is answered from the module
+     * settings the request has already loaded. The setting goes once no language uses it.
+     *
+     * @param string|null $locale the language to empty, null for a setting shared by every language
+     */
+    private function removeSetting(string $key, ?string $locale = null): void
+    {
+        $setting = ModuleConfigQuery::create()
+            ->filterByModuleId(SEOne::getModuleId())
+            ->filterByName($key)
+            ->findOne();
+
+        if (null === $setting) {
+            return;
+        }
+
+        if (null === $locale) {
+            $setting->delete();
+
+            return;
+        }
+
+        foreach (ModuleConfigI18nQuery::create()->filterById($setting->getId())->filterByLocale($locale)->find() as $translation) {
+            $translation->delete();
+        }
+
+        $isUsedByAnotherLanguage = ModuleConfigI18nQuery::create()
+            ->filterById($setting->getId())
+            ->filterByValue('', Criteria::NOT_EQUAL)
+            ->exists();
+
+        if (!$isUsedByAnotherLanguage) {
+            $setting->delete();
+        }
     }
 
     /**
@@ -83,13 +133,19 @@ final readonly class MetaTemplateRepository
     }
 
     /**
-     * @param int|null $maxLength null or a non-positive value restores the field's default
+     * The default length is not stored, for the same reason as an empty template: the pages
+     * would read it for nothing.
+     *
+     * @param int|null $maxLength null, a non-positive value or the default restores the field's default
      */
     public function saveMaxLength(MetaTemplateField $field, ?int $maxLength): void
     {
-        SEOne::setConfigValue(
-            self::maxLengthKey($field),
-            null === $maxLength || $maxLength <= 0 ? '' : (string) $maxLength,
-        );
+        if (null === $maxLength || $maxLength <= 0 || $maxLength === $field->defaultMaxLength()) {
+            $this->removeSetting(self::maxLengthKey($field));
+
+            return;
+        }
+
+        SEOne::setConfigValue(self::maxLengthKey($field), (string) $maxLength);
     }
 }
