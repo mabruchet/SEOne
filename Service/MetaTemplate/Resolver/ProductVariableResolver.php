@@ -27,7 +27,6 @@ use Thelia\Model\CategoryQuery;
 use Thelia\Model\Currency;
 use Thelia\Model\CurrencyQuery;
 use Thelia\Model\Product;
-use Thelia\Model\ProductPriceQuery;
 use Thelia\Model\ProductQuery;
 use Thelia\Model\ProductSaleElementsQuery;
 
@@ -141,37 +140,15 @@ final readonly class ProductVariableResolver implements VariableResolverInterfac
             return ['', ''];
         }
 
-        $productPrice = ProductPriceQuery::create()
-            ->filterByProductSaleElementsId($productSaleElements->getId())
-            ->filterByCurrencyId($currency->getId())
-            ->findOne();
-
-        // A shop may price a product in its default currency only: the browsing currency then has
-        // no row of its own and the default one answers, as the price computation of the front does.
-        if (null === $productPrice) {
-            $defaultCurrency = CurrencyQuery::create()->findOneByByDefault(1);
-
-            if (null === $defaultCurrency || $defaultCurrency->getId() === $currency->getId()) {
-                return ['', ''];
-            }
-
-            $productPrice = ProductPriceQuery::create()
-                ->filterByProductSaleElementsId($productSaleElements->getId())
-                ->filterByCurrencyId($defaultCurrency->getId())
-                ->findOne();
-
-            if (null === $productPrice) {
-                return ['', ''];
-            }
-
-            $currency = $defaultCurrency;
-        }
-
-        $amount = (bool) $productSaleElements->getPromo() ? $productPrice->getPromoPrice() : $productPrice->getPrice();
-
-        if (null === $amount || '' === $amount) {
+        // The reading of the front: the row typed in the browsing currency when there is one,
+        // else the default-currency price converted at the rate of the browsing currency.
+        try {
+            $prices = $productSaleElements->getPricesByCurrency($currency);
+        } catch (\RuntimeException) {
             return ['', ''];
         }
+
+        $amount = (bool) $productSaleElements->getPromo() ? $prices->getPromoPrice() : $prices->getPrice();
 
         return [
             $this->taxedPrice($product, $amount, $currency, $locale),
@@ -179,7 +156,7 @@ final readonly class ProductVariableResolver implements VariableResolverInterfac
         ];
     }
 
-    private function taxedPrice(Product $product, string $amount, Currency $currency, string $locale): string
+    private function taxedPrice(Product $product, float $amount, Currency $currency, string $locale): string
     {
         // TaxEngine::getDeliveryCountry() reads the main request's session without a null check
         // (core TaxEngine.php:50): outside an HTTP request — a console command rendering a
