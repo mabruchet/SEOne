@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace SEOne\Service\MetaTemplate\Resolver;
 
 use SEOne\Service\MetaTemplate\HtmlToPlainText;
+use SEOne\Service\MetaTemplate\PreviewRecordsInterface;
 use SEOne\Service\MetaTemplate\VariableResolverInterface;
 use SEOne\Service\SeoDefaultModels\LocalizedValueTrait;
 use Thelia\Model\Folder;
@@ -23,7 +24,7 @@ use Thelia\Model\FolderQuery;
 /**
  * Variables of a folder page.
  */
-final readonly class FolderVariableResolver implements VariableResolverInterface
+final readonly class FolderVariableResolver implements VariableResolverInterface, PreviewRecordsInterface
 {
     use LocalizedValueTrait;
 
@@ -60,6 +61,18 @@ final readonly class FolderVariableResolver implements VariableResolverInterface
             'chapo' => HtmlToPlainText::convert($this->localizedValue($folder, 'getChapo', $locale)),
             'folder_parent_title' => $this->parentTitle($folder, $locale),
         ];
+    }
+
+    public function listPreviewRecords(string $locale, int $limit): array
+    {
+        $records = [];
+
+        foreach (FolderQuery::create()->joinWithI18n($locale)->orderById()->limit($limit)->find() as $folder) {
+            $title = (string) $folder->setLocale($locale)->getTitle();
+            $records[$folder->getId()] = '' === $title ? '#'.$folder->getId() : $title;
+        }
+
+        return $records;
     }
 
     private function parentTitle(Folder $folder, string $locale): string

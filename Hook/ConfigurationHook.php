@@ -2,6 +2,7 @@
 
 namespace SEOne\Hook;
 
+use SEOne\Controller\ConfigurationController;
 use SEOne\Form\CategoryLimitForm;
 use SEOne\Form\EditRobotTxtForm;
 use SEOne\Form\MetaTemplateForm;
@@ -11,11 +12,13 @@ use SEOne\Model\RobotsQuery;
 use SEOne\SEOne;
 use SEOne\Service\MetaTemplate\MetaTemplateService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Form\TheliaFormFactory;
 use Thelia\Core\Hook\BaseHook;
 use Thelia\Core\Template\Parser\ParserResolver;
 use Thelia\Model\ConfigQuery;
+use Thelia\Model\Lang;
 use Thelia\Model\LangQuery;
 use Thelia\Tools\URL;
 
@@ -23,9 +26,13 @@ class ConfigurationHook extends BaseHook
 {
     use TemplateFallbackTrait;
 
+    /** Records offered for the preview of each page kind; any other one is reachable by its identifier. */
+    private const int PREVIEW_RECORD_LIMIT = 50;
+
     public function __construct(
         private readonly TheliaFormFactory $formFactory,
         private readonly MetaTemplateService $metaTemplateService,
+        private readonly CsrfTokenManagerInterface $csrfTokenManager,
         ?EventDispatcherInterface $dispatcher = null,
         ?ParserResolver $parserResolver = null,
     ) {
@@ -56,36 +63,52 @@ class ConfigurationHook extends BaseHook
         $metaTemplateForm = $this->formFactory->createForm(MetaTemplateForm::getName());
         $metaTemplateForm->createView();
 
+        $metaTemplateEditLanguageId = $this->getMetaTemplateEditLanguageId();
+
         $event->add(
             $this->render('SEOne/module_configuration.html.twig', [
                 'store_form' => $storeForm->getView(),
                 'category_form' => $categoryForm->getView(),
                 'robot_forms' => $robotForms,
                 'meta_template_form' => $metaTemplateForm->getView(),
-                'meta_template_views' => $this->getMetaTemplateViews(),
-                'meta_template_edit_language_id' => $this->getMetaTemplateEditLanguageId(),
+                'meta_template_views' => $this->getMetaTemplateViews($this->getLocaleOfLanguage($metaTemplateEditLanguageId)),
+                'meta_template_edit_language_id' => $metaTemplateEditLanguageId,
+                'meta_template_preview_token' => $this->csrfTokenManager
+                    ->getToken(ConfigurationController::META_TEMPLATE_PREVIEW_TOKEN_ID)
+                    ->getValue(),
             ])
         );
     }
 
     /**
      * One entry per view served by a resolver, in declaration order, each carrying the
-     * variables its templates may use.
+     * variables its templates may use and the records offered for the preview, the first of
+     * them chosen by default.
      *
-     * @return list<array{view: string, variables: list<string>}>
+     * @return list<array{view: string, variables: list<string>, records: array<int, string>, example_id: int|null}>
      */
-    protected function getMetaTemplateViews(): array
+    protected function getMetaTemplateViews(string $locale): array
     {
         $views = [];
 
         foreach (array_keys($this->metaTemplateService->getResolvers()) as $view) {
+            $records = $this->metaTemplateService->listPreviewRecords($view, $locale, self::PREVIEW_RECORD_LIMIT);
+            $exampleId = array_key_first($records);
+
             $views[] = [
                 'view' => $view,
                 'variables' => $this->metaTemplateService->getVariableNames($view),
+                'records' => $records,
+                'example_id' => $exampleId,
             ];
         }
 
         return $views;
+    }
+
+    private function getLocaleOfLanguage(int $languageId): string
+    {
+        return (string) (LangQuery::create()->findPk($languageId) ?? Lang::getDefaultLanguage())->getLocale();
     }
 
     /**

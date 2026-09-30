@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace SEOne\Service\MetaTemplate\Resolver;
 
 use SEOne\Service\MetaTemplate\HtmlToPlainText;
+use SEOne\Service\MetaTemplate\PreviewRecordsInterface;
 use SEOne\Service\MetaTemplate\VariableResolverInterface;
 use SEOne\Service\SeoDefaultModels\LocalizedValueTrait;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -34,7 +35,7 @@ use Thelia\Model\ProductSaleElementsQuery;
  * Variables of a product page. Prices are those of the default sale element, in the currency the
  * visitor browses in, formatted the way the rest of the shop formats money.
  */
-final readonly class ProductVariableResolver implements VariableResolverInterface
+final readonly class ProductVariableResolver implements VariableResolverInterface, PreviewRecordsInterface
 {
     use LocalizedValueTrait;
 
@@ -88,6 +89,18 @@ final readonly class ProductVariableResolver implements VariableResolverInterfac
             'taxed_price' => $taxedPrice,
             'untaxed_price' => $untaxedPrice,
         ];
+    }
+
+    public function listPreviewRecords(string $locale, int $limit): array
+    {
+        $records = [];
+
+        foreach (ProductQuery::create()->joinWithI18n($locale)->orderById()->limit($limit)->find() as $product) {
+            $title = (string) $product->setLocale($locale)->getTitle();
+            $records[$product->getId()] = '' === $title ? (string) $product->getRef() : $title.' ('.$product->getRef().')';
+        }
+
+        return $records;
     }
 
     private function brandTitle(Product $product, string $locale): string

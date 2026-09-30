@@ -23,9 +23,13 @@ use SEOne\Service\MetaTemplate\MetaTemplateField;
 use SEOne\Service\MetaTemplate\MetaTemplateRepository;
 use SEOne\Service\MetaTemplate\MetaTemplateService;
 use SEOne\Service\RobotTxtService;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Csrf\CsrfToken;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Thelia\Controller\Admin\AdminController;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Resource\AdminResources;
@@ -35,6 +39,20 @@ use Thelia\Form\Exception\FormValidationException;
 #[Route('/admin/module/seone', name: 'seone_config_')]
 class ConfigurationController extends AdminController
 {
+    public const string META_TEMPLATE_PREVIEW_TOKEN_ID = 'seone_meta_template_preview';
+
+    /**
+     * The back-office resource that guards the records of each native page kind: the preview
+     * reads a record, so it asks for the right to see it. A page kind brought by another module
+     * is guarded by the SEOne module right alone.
+     */
+    private const array META_TEMPLATE_PREVIEW_RESOURCES = [
+        'product' => AdminResources::PRODUCT,
+        'category' => AdminResources::CATEGORY,
+        'content' => AdminResources::CONTENT,
+        'folder' => AdminResources::FOLDER,
+    ];
+
     #[Route('/configuration/category', name: 'category_configuration', methods: 'POST')]
     public function saveCategoryConfiguration(ParserContext $parserContext): RedirectResponse|Response|null
     {
@@ -161,6 +179,71 @@ class ConfigurationController extends AdminController
         $this->addFlash('success', $this->getTranslator()->trans('Configuration correctly saved', [], SEOne::DOMAIN_NAME, $locale));
 
         return $this->generateSuccessRedirect($baseForm);
+    }
+
+    /**
+     * Renders the templates typed on the screen, saved or not, on a record the administrator
+     * picks, with the same rendering and maximum lengths the pages use. Nothing is written.
+     */
+    #[Route('/configuration/meta-templates/preview', name: 'meta_templates_preview', methods: 'POST')]
+    public function previewMetaTemplates(
+        Request $request,
+        MetaTemplateService $metaTemplateService,
+        CsrfTokenManagerInterface $csrfTokenManager,
+    ): Response {
+        if (null !== $response = $this->checkAuth([AdminResources::MODULE], ['Seone'], AccessManager::UPDATE)) {
+            return $response;
+        }
+
+        $locale = (string) $this->getCurrentEditionLocale();
+
+        if (!$csrfTokenManager->isTokenValid(new CsrfToken(self::META_TEMPLATE_PREVIEW_TOKEN_ID, (string) $request->request->get('_token')))) {
+            return $this->previewError('meta_template.preview.error.token', Response::HTTP_FORBIDDEN);
+        }
+
+        $view = (string) $request->request->get('view');
+
+        if (null === $metaTemplateService->getResolver($view)) {
+            return $this->previewError('meta_template.preview.error.view', Response::HTTP_BAD_REQUEST);
+        }
+
+        $recordResource = self::META_TEMPLATE_PREVIEW_RESOURCES[$view] ?? null;
+
+        if (null !== $recordResource && null !== $response = $this->checkAuth([$recordResource], [], AccessManager::VIEW)) {
+            return $response;
+        }
+
+        $id = filter_var($request->request->get('id'), \FILTER_VALIDATE_INT) ?: 0;
+        $values = $metaTemplateService->getVariableValues($view, $id, $locale);
+
+        if ([] === $values) {
+            return $this->previewError('meta_template.preview.error.record', Response::HTTP_NOT_FOUND);
+        }
+
+        $fields = [];
+
+        foreach (MetaTemplateField::cases() as $field) {
+            $template = trim((string) $request->request->get($field->value));
+            $maxLength = filter_var($request->request->get('max_length_'.$field->value), \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null;
+            $rendered = $metaTemplateService->renderTemplate($view, $field, $template, $id, $locale, $maxLength);
+
+            $fields[$field->value] = [
+                'rendered' => $rendered,
+                'length' => mb_strlen($rendered),
+                'unknown' => $metaTemplateService->findUnknownVariables($view, $template),
+            ];
+        }
+
+        return new JsonResponse(['id' => $id, 'values' => $values, 'fields' => $fields]);
+    }
+
+    private function previewError(string $message, int $status): JsonResponse
+    {
+        // In the administrator's own language, not in the edition language of the templates.
+        return new JsonResponse(
+            ['error' => $this->getTranslator()->trans($message, [], SEOne::DOMAIN_NAME)],
+            $status,
+        );
     }
 
     #[Route('/edit-robottxt', name: 'edit_robottxt', methods: 'POST')]

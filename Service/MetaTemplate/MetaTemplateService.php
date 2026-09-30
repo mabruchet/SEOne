@@ -125,9 +125,11 @@ final class MetaTemplateService implements ResetInterface
     }
 
     /**
-     * Same as render(), for a template that is not saved yet (the configuration screen's check).
+     * Same as render(), for a template that is not saved yet (the configuration screen's preview).
+     *
+     * @param int|null $maxLength the maximum typed on the screen; null applies the saved one
      */
-    public function renderTemplate(string $view, MetaTemplateField $field, string $template, int $id, string $locale): string
+    public function renderTemplate(string $view, MetaTemplateField $field, string $template, int $id, string $locale, ?int $maxLength = null): string
     {
         $values = $this->resolveValues($view, $id, $locale);
 
@@ -135,7 +137,30 @@ final class MetaTemplateService implements ResetInterface
             return '';
         }
 
-        return $this->renderer->render($template, $values, $this->repository->getMaxLength($field));
+        return $this->renderer->render($template, $values, $maxLength ?? $this->repository->getMaxLength($field));
+    }
+
+    /**
+     * Every variable of the view with its value for this record, store name included; an empty
+     * array when the record does not exist. What the configuration screen shows as an example.
+     *
+     * @return array<string, string>
+     */
+    public function getVariableValues(string $view, int $id, string $locale): array
+    {
+        return $this->resolveValues($view, $id, $locale);
+    }
+
+    /**
+     * A few records of the view to preview a template on, for the resolvers that can name them.
+     *
+     * @return array<int, string> record identifier => label
+     */
+    public function listPreviewRecords(string $view, string $locale, int $limit): array
+    {
+        $resolver = $this->getResolver($view);
+
+        return $resolver instanceof PreviewRecordsInterface ? $resolver->listPreviewRecords($locale, $limit) : [];
     }
 
     public function reset(): void
@@ -148,6 +173,10 @@ final class MetaTemplateService implements ResetInterface
      */
     private function resolveValues(string $view, int $id, string $locale): array
     {
+        if ($id <= 0) {
+            return [];
+        }
+
         $key = $view.'|'.$id.'|'.$locale;
 
         if (\array_key_exists($key, $this->resolvedValues)) {

@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace SEOne\Service\MetaTemplate\Resolver;
 
 use SEOne\Service\MetaTemplate\HtmlToPlainText;
+use SEOne\Service\MetaTemplate\PreviewRecordsInterface;
 use SEOne\Service\MetaTemplate\VariableResolverInterface;
 use SEOne\Service\SeoDefaultModels\LocalizedValueTrait;
 use Thelia\Model\Category;
@@ -24,7 +25,7 @@ use Thelia\Model\ProductQuery;
 /**
  * Variables of a category page.
  */
-final readonly class CategoryVariableResolver implements VariableResolverInterface
+final readonly class CategoryVariableResolver implements VariableResolverInterface, PreviewRecordsInterface
 {
     use LocalizedValueTrait;
 
@@ -66,6 +67,18 @@ final readonly class CategoryVariableResolver implements VariableResolverInterfa
                 ->count(),
             'category_parent_title' => $this->parentTitle($category, $locale),
         ];
+    }
+
+    public function listPreviewRecords(string $locale, int $limit): array
+    {
+        $records = [];
+
+        foreach (CategoryQuery::create()->joinWithI18n($locale)->orderById()->limit($limit)->find() as $category) {
+            $title = (string) $category->setLocale($locale)->getTitle();
+            $records[$category->getId()] = '' === $title ? '#'.$category->getId() : $title;
+        }
+
+        return $records;
     }
 
     private function parentTitle(Category $category, string $locale): string
