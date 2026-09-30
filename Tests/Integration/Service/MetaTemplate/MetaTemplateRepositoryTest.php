@@ -22,9 +22,12 @@ use SEOne\Service\SeoRequestMemo;
 use Thelia\Model\ModuleConfig;
 use Thelia\Model\ModuleConfigQuery;
 use Thelia\Test\IntegrationTestCase;
+use Thelia\Test\Trait\RecordsSqlQueries;
 
 final class MetaTemplateRepositoryTest extends IntegrationTestCase
 {
+    use RecordsSqlQueries;
+
     #[Test]
     public function anEmptyTemplateLeavesNoSettingThePagesWouldRead(): void
     {
@@ -86,6 +89,30 @@ final class MetaTemplateRepositoryTest extends IntegrationTestCase
         $this->createRepository()->saveMaxLength(MetaTemplateField::Description, null);
 
         self::assertNull($this->findSetting(MetaTemplateRepository::maxLengthKey(MetaTemplateField::Description)));
+    }
+
+    #[Test]
+    public function aPageWhoseTemplatesWereEmptiedReadsNoSetting(): void
+    {
+        $repository = $this->createRepository();
+
+        foreach (MetaTemplateField::cases() as $field) {
+            $repository->saveTemplate('product', $field, 'en_US', '%title%');
+            $repository->saveTemplate('product', $field, 'en_US', '');
+        }
+
+        // Settings already loaded, as they are on a page once any other setting was read.
+        SEOne::getConfigValue('is_initialized');
+
+        $statements = $this->recordSqlQueries(function (): void {
+            $repository = $this->createRepository();
+
+            foreach (MetaTemplateField::cases() as $field) {
+                self::assertSame('', $repository->getTemplate('product', $field, 'en_US'));
+            }
+        });
+
+        self::assertSame([], $statements);
     }
 
     private function createRepository(): MetaTemplateRepository
