@@ -107,6 +107,30 @@ final class MetaTemplateRendererTest extends TestCase
             ['title' => '0', 'brand' => '0'],
             '0 - 0',
         ];
+
+        yield 'the scheme of a URL in a value is kept' => [
+            '%description%',
+            ['description' => 'Voir http://example.com/promo'],
+            'Voir http://example.com/promo',
+        ];
+
+        yield 'a slash closing a URL at the end of the text is kept' => [
+            '%description%',
+            ['description' => 'Voir http://example.com/'],
+            'Voir http://example.com/',
+        ];
+
+        yield 'a negative number after a colon is kept' => [
+            '%title% : -20 % sur tout',
+            ['title' => 'Soldes'],
+            'Soldes : -20 % sur tout',
+        ];
+
+        yield 'a leading literal minus is kept' => [
+            '-20% sur %title%',
+            ['title' => 'Horatio'],
+            '-20% sur Horatio',
+        ];
     }
 
     #[Test]

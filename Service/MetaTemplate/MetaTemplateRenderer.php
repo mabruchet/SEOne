@@ -29,6 +29,12 @@ final readonly class MetaTemplateRenderer
     private const string SEPARATOR = '[,;:|\/\-\x{2013}\x{2014}\x{00B7}]';
 
     /**
+     * What may follow a separator for it to be one the template wrote, not a character of a
+     * value: a space or the end of the text. "http://", "-20 %" or "T-shirt" keep their punctuation.
+     */
+    private const string SEPARATOR_END = '(?=\s|$)';
+
+    /**
      * Variable names used by the template, without their markers, each once, in order of appearance.
      *
      * @return list<string>
@@ -72,8 +78,10 @@ final readonly class MetaTemplateRenderer
         // the variable before the comma was empty.
         $text = preg_replace('/\s+([,;.])/u', '$1', $text) ?? $text;
 
-        // A run of separators ("Horatio - - Thelia", "Horatio, , Thelia") keeps its first one.
-        $text = preg_replace('/(\s*'.self::SEPARATOR.')(?:\s*'.self::SEPARATOR.')+/u', '$1', $text) ?? $text;
+        // A run of separators ("Horatio - - Thelia", "Horatio, , Thelia") keeps its first one. The
+        // run has to end the way a separator of the template does, before a space: the "://" of
+        // a URL or the ": -" before a negative number are no run of orphan separators.
+        $text = preg_replace('/(\s*'.self::SEPARATOR.')(?:\s*'.self::SEPARATOR.')+'.self::SEPARATOR_END.'/u', '$1', $text) ?? $text;
 
         // A separator right before a full stop ("Horatio,." once the variables in between were
         // empty) has nothing left to separate: the sentence keeps its full stop only.
@@ -84,8 +92,14 @@ final readonly class MetaTemplateRenderer
 
     private function trimSeparators(string $text): string
     {
-        $text = preg_replace('/^(?:\s*'.self::SEPARATOR.')+\s*/u', '', $text) ?? $text;
-        $text = preg_replace('/\s*(?:'.self::SEPARATOR.'\s*)+$/u', '', $text) ?? $text;
+        // A leading separator is an orphan when a space follows it ("- Horatio", ", Horatio"),
+        // never when it opens a word: "-20% sur Horatio" keeps its minus.
+        $text = preg_replace('/^(?:\s*'.self::SEPARATOR.')+'.self::SEPARATOR_END.'\s*/u', '', $text) ?? $text;
+
+        // A trailing separator is an orphan when a space precedes it ("Horatio -") or when it is a
+        // punctuation mark glued to the last word ("Horatio,"); a dash or a slash that closes a
+        // word belongs to it ("http://example.com/").
+        $text = preg_replace('/(?:\s+'.self::SEPARATOR.'|(?<=\S)[,;:])(?:\s*'.self::SEPARATOR.')*\s*$/u', '', $text) ?? $text;
 
         return trim($text);
     }
