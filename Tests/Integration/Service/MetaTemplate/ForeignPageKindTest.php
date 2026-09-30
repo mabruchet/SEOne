@@ -16,6 +16,7 @@ namespace SEOne\Tests\Integration\Service\MetaTemplate;
 
 use PHPUnit\Framework\Attributes\Test;
 use SEOne\Form\MetaTemplateForm;
+use SEOne\Service\MetaTemplate\EditionLanguageResolver;
 use SEOne\Service\MetaTemplate\MetaTemplateField;
 use SEOne\Service\MetaTemplate\MetaTemplateRenderer;
 use SEOne\Service\MetaTemplate\MetaTemplateRepository;
@@ -113,7 +114,7 @@ final class ForeignPageKindTest extends IntegrationTestCase
         // The shop's form factory builds the form from the shop's own services; this one is
         // built the same way from the services compiled above.
         $form = new MetaTemplateForm(
-            $this->getService(RequestStack::class),
+            new EditionLanguageResolver($this->getService(RequestStack::class)),
             $service,
             new MetaTemplateRepository(new SeoRequestMemo()),
         );

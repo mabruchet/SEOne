@@ -15,20 +15,17 @@ declare(strict_types=1);
 namespace SEOne\Form;
 
 use SEOne\SEOne;
+use SEOne\Service\MetaTemplate\EditionLanguageResolver;
 use SEOne\Service\MetaTemplate\MetaTemplateField;
 use SEOne\Service\MetaTemplate\MetaTemplateRepository;
 use SEOne\Service\MetaTemplate\MetaTemplateService;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Validator\Constraints\Callback;
 use Symfony\Component\Validator\Constraints\Range;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
-use Thelia\Core\HttpFoundation\Session\Session;
 use Thelia\Core\Translation\Translator;
 use Thelia\Form\BaseForm;
-use Thelia\Model\Lang;
-use Thelia\Model\LangQuery;
 
 /**
  * One title and one description template per view, in the back-office edition language,
@@ -41,7 +38,7 @@ use Thelia\Model\LangQuery;
 class MetaTemplateForm extends BaseForm
 {
     public function __construct(
-        private readonly RequestStack $requestStack,
+        private readonly EditionLanguageResolver $editionLanguageResolver,
         private readonly MetaTemplateService $metaTemplateService,
         private readonly MetaTemplateRepository $metaTemplateRepository,
     ) {
@@ -64,7 +61,7 @@ class MetaTemplateForm extends BaseForm
 
     protected function buildForm(): void
     {
-        $locale = $this->getEditionLocale();
+        $locale = $this->editionLanguageResolver->resolveLocale();
 
         foreach (array_keys($this->metaTemplateService->getResolvers()) as $view) {
             foreach (MetaTemplateField::cases() as $field) {
@@ -125,33 +122,5 @@ class MetaTemplateForm extends BaseForm
     private function translate(string $id, array $parameters = []): string
     {
         return (string) Translator::getInstance()->trans($id, $parameters, SEOne::DOMAIN_NAME);
-    }
-
-    /**
-     * The same language the controller saves into: the one the back-office language selector
-     * posts, then the administrator's own language. Reading in another language than the one
-     * the save writes leaves the field empty after a successful save.
-     */
-    private function getEditionLocale(): string
-    {
-        $request = $this->requestStack->getMainRequest();
-
-        $editionLanguageId = $request?->query->get('edit_language_id') ?? $request?->request->get('edit_language_id');
-
-        if (null !== $editionLanguageId) {
-            $editionLanguage = LangQuery::create()->findOneById($editionLanguageId);
-
-            if (null !== $editionLanguage) {
-                return (string) $editionLanguage->getLocale();
-            }
-        }
-
-        $session = $request?->getSession();
-
-        if ($session instanceof Session) {
-            return (string) $session->getAdminLang()->getLocale();
-        }
-
-        return (string) Lang::getDefaultLanguage()->getLocale();
     }
 }

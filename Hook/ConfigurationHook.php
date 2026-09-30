@@ -10,6 +10,7 @@ use SEOne\Form\StoreSeoForm;
 use SEOne\Model\Robots;
 use SEOne\Model\RobotsQuery;
 use SEOne\SEOne;
+use SEOne\Service\MetaTemplate\EditionLanguageResolver;
 use SEOne\Service\MetaTemplate\MetaTemplateService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
@@ -18,7 +19,6 @@ use Thelia\Core\Form\TheliaFormFactory;
 use Thelia\Core\Hook\BaseHook;
 use Thelia\Core\Template\Parser\ParserResolver;
 use Thelia\Model\ConfigQuery;
-use Thelia\Model\Lang;
 use Thelia\Model\LangQuery;
 use Thelia\Tools\URL;
 
@@ -33,6 +33,7 @@ class ConfigurationHook extends BaseHook
         private readonly TheliaFormFactory $formFactory,
         private readonly MetaTemplateService $metaTemplateService,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
+        private readonly EditionLanguageResolver $editionLanguageResolver,
         ?EventDispatcherInterface $dispatcher = null,
         ?ParserResolver $parserResolver = null,
     ) {
@@ -63,7 +64,8 @@ class ConfigurationHook extends BaseHook
         $metaTemplateForm = $this->formFactory->createForm(MetaTemplateForm::getName());
         $metaTemplateForm->createView();
 
-        $metaTemplateEditLanguageId = $this->getMetaTemplateEditLanguageId();
+        // The language the templates are shown in is the one the form fills and the controller saves into.
+        $metaTemplateEditLanguage = $this->editionLanguageResolver->resolve();
 
         $event->add(
             $this->render('SEOne/module_configuration.html.twig', [
@@ -71,8 +73,8 @@ class ConfigurationHook extends BaseHook
                 'category_form' => $categoryForm->getView(),
                 'robot_forms' => $robotForms,
                 'meta_template_form' => $metaTemplateForm->getView(),
-                'meta_template_views' => $this->getMetaTemplateViews($this->getLocaleOfLanguage($metaTemplateEditLanguageId)),
-                'meta_template_edit_language_id' => $metaTemplateEditLanguageId,
+                'meta_template_views' => $this->getMetaTemplateViews((string) $metaTemplateEditLanguage->getLocale()),
+                'meta_template_edit_language_id' => (int) $metaTemplateEditLanguage->getId(),
                 'meta_template_preview_token' => $this->csrfTokenManager
                     ->getToken(ConfigurationController::META_TEMPLATE_PREVIEW_TOKEN_ID)
                     ->getValue(),
@@ -105,27 +107,6 @@ class ConfigurationHook extends BaseHook
         }
 
         return $views;
-    }
-
-    private function getLocaleOfLanguage(int $languageId): string
-    {
-        return (string) (LangQuery::create()->findPk($languageId) ?? Lang::getDefaultLanguage())->getLocale();
-    }
-
-    /**
-     * The language the templates are shown and saved in: the one the switcher asked for, then
-     * the administrator's own, which is what the controller resolves on save.
-     */
-    protected function getMetaTemplateEditLanguageId(): int
-    {
-        $request = $this->getRequest();
-        $requestedLanguageId = $request?->query->get('edit_language_id') ?? $request?->request->get('edit_language_id');
-
-        if (null !== $requestedLanguageId && null !== LangQuery::create()->findOneById($requestedLanguageId)) {
-            return (int) $requestedLanguageId;
-        }
-
-        return (int) $this->getSession()->getAdminLang()->getId();
     }
 
     public static function getSubscribedHooks(): array
