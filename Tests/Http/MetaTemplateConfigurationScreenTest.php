@@ -22,6 +22,7 @@ use SEOne\Service\SeoRequestMemo;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Resource\AdminResources;
+use Thelia\Core\Template\Parser\ParserResolver;
 use Thelia\Model\Admin;
 use Thelia\Model\LangQuery;
 use Thelia\Model\Product;
@@ -52,6 +53,10 @@ final class MetaTemplateConfigurationScreenTest extends WebIntegrationTestCase
         // Built on the connection, not through createFixtureFactory(): no synthetic request
         // must become the main request of the client's calls.
         $this->fixtures = new FixtureFactory(Propel::getConnection('TheliaMain'));
+
+        // The core keeps the parser of the last render in a static: after a refusal page, the
+        // next request of the same process would render the module screen with it, empty.
+        (new \ReflectionProperty(ParserResolver::class, 'currentParser'))->setValue(null, null);
     }
 
     protected function tearDown(): void

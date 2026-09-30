@@ -19,8 +19,11 @@ use SEOne\Model\SeoneQuery;
 use SEOne\SEOne as SEOneModule;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Thelia\Controller\Admin\BaseAdminController;
+use Thelia\Core\Security\AccessManager;
+use Thelia\Core\Security\Resource\AdminResources;
 use Thelia\Model\LangQuery;
 use Thelia\Model\MetaDataQuery;
 use Thelia\Tools\URL;
@@ -29,11 +32,35 @@ use Thelia\Tools\URL;
 class SEOneController extends BaseAdminController
 {
     /**
+     * The SEO block is part of the record it describes: saving it takes the right to update
+     * that record, the one the SEO tab of the record asks for. A kind of record SEOne does not
+     * know is guarded by the SEOne module right.
+     */
+    private const array RECORD_RESOURCES = [
+        'product' => AdminResources::PRODUCT,
+        'category' => AdminResources::CATEGORY,
+        'content' => AdminResources::CONTENT,
+        'folder' => AdminResources::FOLDER,
+        'brand' => AdminResources::BRAND,
+    ];
+
+    /**
      * @throws PropelException
      */
     #[Route('/save', name: '_save', methods: 'POST')]
-    public function saveAction(Request $request): RedirectResponse
+    public function saveAction(Request $request): RedirectResponse|Response
     {
+        $objectType = (string) ($request->query->get('object_type') ?? $request->request->get('object_type'));
+        $recordResource = self::RECORD_RESOURCES[$objectType] ?? null;
+
+        $response = null === $recordResource
+            ? $this->checkAuth([AdminResources::MODULE], ['Seone'], AccessManager::UPDATE)
+            : $this->checkAuth([$recordResource], [], AccessManager::UPDATE);
+
+        if (null !== $response) {
+            return $response;
+        }
+
         $form = $this->createForm(name: SeoForm::getName());
 
         $seoForm = $this->validateForm($form);

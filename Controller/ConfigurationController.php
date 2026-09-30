@@ -56,6 +56,10 @@ class ConfigurationController extends AdminController
     #[Route('/configuration/category', name: 'category_configuration', methods: 'POST')]
     public function saveCategoryConfiguration(ParserContext $parserContext): RedirectResponse|Response|null
     {
+        if (null !== $response = $this->checkAuth([AdminResources::MODULE], ['Seone'], AccessManager::UPDATE)) {
+            return $response;
+        }
+
         $form = $this->createForm(CategoryLimitForm::getName());
         try {
             $data = $this->validateForm($form)->getData();
@@ -247,8 +251,12 @@ class ConfigurationController extends AdminController
     }
 
     #[Route('/edit-robottxt', name: 'edit_robottxt', methods: 'POST')]
-    public function editRobotTxt(ParserContext $parserContext, RobotTxtService $robotTxtService): RedirectResponse
+    public function editRobotTxt(ParserContext $parserContext, RobotTxtService $robotTxtService): RedirectResponse|Response
     {
+        if (null !== $response = $this->checkAuth([AdminResources::MODULE], ['Seone'], AccessManager::UPDATE)) {
+            return $response;
+        }
+
         $form = $this->createForm(EditRobotTxtForm::getName());
 
         try {
