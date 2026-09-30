@@ -72,6 +72,18 @@ final class MetaTemplateRendererTest extends TestCase
             'Horatio.',
         ];
 
+        yield 'template engine syntax is served as typed' => [
+            '{{ 7*7 }} {% if true %}%title%{% endif %} ${7*7} <?php echo 1; ?>',
+            ['title' => 'Horatio'],
+            '{{ 7*7 }} {% if true %}Horatio{% endif %} ${7*7} <?php echo 1; ?>',
+        ];
+
+        yield 'a value is inserted as text, never rendered in turn' => [
+            '%title% chez %store_name%',
+            ['title' => '{{ 7*7 }} %store_name%', 'store_name' => 'Ma boutique'],
+            '{{ 7*7 }} %store_name% chez Ma boutique',
+        ];
+
         yield 'unknown variable is removed' => [
             '%titel% %title%',
             ['title' => 'Horatio'],
