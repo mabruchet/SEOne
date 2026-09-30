@@ -16,6 +16,7 @@ namespace SEOne\Service\MetaTemplate;
 
 use SEOne\SEOne;
 use SEOne\Service\SeoRequestMemo;
+use Thelia\Model\ConfigQuery;
 
 /**
  * Meta templates live in the module settings, next to the default title and description SEOne
@@ -26,6 +27,7 @@ final readonly class MetaTemplateRepository
 {
     private const string TEMPLATE_KEY_PREFIX = 'meta_template_';
     private const string MAX_LENGTH_KEY_PREFIX = 'meta_template_max_length_';
+    private const string STORE_NAME_KEY = 'title';
 
     public function __construct(private SeoRequestMemo $seoRequestMemo)
     {
@@ -52,6 +54,21 @@ final readonly class MetaTemplateRepository
     public function saveTemplate(string $view, MetaTemplateField $field, string $locale, string $template): void
     {
         SEOne::setConfigValue(self::templateKey($view, $field), trim($template), $locale);
+    }
+
+    /**
+     * The store name in this language: the one SEOne keeps per language in its settings (the same
+     * the SEO models fall back on for an empty title), then the store name of the core.
+     */
+    public function getStoreName(string $locale): string
+    {
+        $storeName = trim((string) $this->seoRequestMemo->getConfigValue(self::STORE_NAME_KEY, null, $locale));
+
+        if ('' === $storeName) {
+            $storeName = trim((string) ConfigQuery::read('store_name'));
+        }
+
+        return $storeName;
     }
 
     public function getMaxLength(MetaTemplateField $field): int

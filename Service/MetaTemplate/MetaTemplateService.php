@@ -16,7 +16,6 @@ namespace SEOne\Service\MetaTemplate;
 
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Contracts\Service\ResetInterface;
-use Thelia\Model\ConfigQuery;
 
 /**
  * The one entry point for meta templates: the SEO models ask it for a rendered title or
@@ -164,7 +163,7 @@ final class MetaTemplateService implements ResetInterface
         $values = $resolver->resolve($id, $locale);
 
         if ([] !== $values) {
-            $values[self::STORE_NAME_VARIABLE] = (string) (ConfigQuery::read('store_name') ?? '');
+            $values[self::STORE_NAME_VARIABLE] = $this->repository->getStoreName($locale);
         }
 
         return $this->resolvedValues[$key] = $values;
