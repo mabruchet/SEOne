@@ -90,9 +90,11 @@
                                         <div class="mb-4">
                                             {{ form_label(field) }}
                                             {{ form_widget(field, {attr: {class: 'form-control'}}) }}
-                                            <small class="text-muted d-block mt-1"
+                                            {% set template_length = field.vars.value|default('')|length %}
+                                            <small class="d-block mt-1 {{ template_length > max_length ? 'text-danger fw-semibold' : 'text-muted' }}"
                                                    data-seone-counter-for="{{ field.vars.id }}"
-                                                   data-seone-counter-max="{{ max_length }}">{{ field.vars.value|default('')|length }} / {{ max_length }}</small>
+                                                   data-seone-counter-max="{{ max_length }}"
+                                                   data-seone-counter-max-input="{{ attribute(meta_template_form, 'max_length_' ~ field_key).vars.id }}">{{ template_length }} / {{ max_length }}</small>
                                             <div class="mt-2">
                                                 <small class="text-muted d-block mb-1">{{ 'meta_template.variables'|trans({}, 'seone') }}</small>
                                                 {% for variable in entry.variables %}
@@ -221,15 +223,34 @@
             });
         });
 
-        card.querySelectorAll('[data-seone-counter-for]').forEach(function (counter) {
+        // The counter follows both the template and the maximum typed above it, before any save.
+        var updateCounter = function (counter) {
             var input = document.getElementById(counter.dataset.seoneCounterFor);
+            var maxInput = document.getElementById(counter.dataset.seoneCounterMaxInput);
+            var max = parseInt(maxInput && '' !== maxInput.value ? maxInput.value : counter.dataset.seoneCounterMax, 10);
 
-            if (!input) {
+            if (!input || isNaN(max)) {
                 return;
             }
 
-            input.addEventListener('input', function () {
-                counter.textContent = input.value.length + ' / ' + counter.dataset.seoneCounterMax;
+            var exceeds = input.value.length > max;
+
+            counter.textContent = input.value.length + ' / ' + max;
+            // Bootstrap text utilities: red and bolder past the maximum, muted below it.
+            counter.classList.toggle('text-danger', exceeds);
+            counter.classList.toggle('fw-semibold', exceeds);
+            counter.classList.toggle('text-muted', !exceeds);
+        };
+
+        card.querySelectorAll('[data-seone-counter-for]').forEach(function (counter) {
+            [counter.dataset.seoneCounterFor, counter.dataset.seoneCounterMaxInput].forEach(function (id) {
+                var watched = document.getElementById(id);
+
+                if (watched) {
+                    watched.addEventListener('input', function () {
+                        updateCounter(counter);
+                    });
+                }
             });
         });
     });
