@@ -75,7 +75,8 @@ class SEOne extends BaseModule
     public static function configureServices(ServicesConfigurator $servicesConfigurator): void
     {
         $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
-            ->exclude([__DIR__.'/I18n/*'])
+            // The tests are no services of the shop: a fixture resolver would give it a page kind.
+            ->exclude([__DIR__.'/I18n/*', __DIR__.'/Tests/*'])
             ->autowire(true)
             ->autoconfigure(true);
     }
