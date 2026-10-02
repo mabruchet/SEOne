@@ -25,6 +25,9 @@ class AlternateHreflangListener implements EventSubscriberInterface
         $multiDomainActivated = ConfigQuery::isMultiDomainActivated();
 
         switch ($view) {
+            case 'brand':
+                $uri = $this->findUrlFromView($event, 'brand', 'brand_id');
+                break;
             case 'product':
                 $uri = $this->findUrlFromView($event, 'product', 'product_id');
                 break;
